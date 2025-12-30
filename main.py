@@ -13,7 +13,6 @@ def gen_email():
     name = ''.join(random.choices(string.ascii_lowercase + string.digits, k=7))
     return f"{name}@{DOMAIN}"
 
-# লিঙ্ক বের করা এবং কোড বোল্ড করার ফাংশন
 def extract_links(text):
     return re.findall(r'(https?://\S+)', text)
 
@@ -41,7 +40,7 @@ def start(m):
 def new_email(m):
     email = gen_email()
     set_user_email(m.chat.id, email)
-    bot.send_message(m.chat.id, f"✅ *New Email:* `{email}`", parse_mode="Markdown")
+    bot.send_message(m.chat.id, f"✅ *New Email Generated:*\n`{email}`", parse_mode="Markdown")
 
 @bot.message_handler(func=lambda m: m.text == "📨 My Email History")
 def show_history(m):
@@ -49,14 +48,14 @@ def show_history(m):
     
     if not emails:
         current = get_user_email(m.chat.id)
-        bot.send_message(m.chat.id, f"📍 *Current:* `{current}`\n(No history found)")
+        bot.send_message(m.chat.id, f"📍 *Current:* `{current}`\n(No history found)", parse_mode="Markdown")
         return
 
     markup = InlineKeyboardMarkup()
     for email in emails:
         markup.add(InlineKeyboardButton(text=f"📧 {email}", callback_data=f"set_{email}"))
     
-    bot.send_message(m.chat.id, "📜 *Last 50 Emails:*\nClick to activate an old address.", reply_markup=markup, parse_mode="Markdown")
+    bot.send_message(m.chat.id, "📜 *Your Last 50 Emails:*\nClick to activate an old address.", reply_markup=markup, parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('set_'))
 def handle_set_email(call):
@@ -71,7 +70,7 @@ def refresh(m):
     inbox = get_inbox(email)
     
     if not inbox:
-        bot.send_message(m.chat.id, "📭 *Inbox Empty*")
+        bot.send_message(m.chat.id, "📭 *Inbox is empty for:* \n`" + email + "`", parse_mode="Markdown")
         return
 
     for sender, subject, body, time in inbox:
@@ -88,4 +87,6 @@ def refresh(m):
         
         bot.send_message(m.chat.id, text[:4096], reply_markup=markup, parse_mode="Markdown")
 
-bot.infinity_polling()
+if __name__ == "__main__":
+    print("Bot is running...")
+    bot.infinity_polling()
