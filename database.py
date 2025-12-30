@@ -1,4 +1,5 @@
 import sqlite3
+import os
 
 conn = sqlite3.connect("tempmail.db", check_same_thread=False)
 cur = conn.cursor()
@@ -46,3 +47,8 @@ def get_inbox(email):
     )
     return cur.fetchall()
 
+# নতুন ফাংশন: ইউজারের শেষ ৫০টি ইউনিক মেইল বের করা
+def get_user_all_emails(tg_id):
+    # ইনবক্স টেবিল থেকে ওই ইউজারের ব্যবহৃত সব ডোমেইন মেইল সংগ্রহ
+    cur.execute("SELECT DISTINCT email FROM inbox WHERE email LIKE ? ORDER BY id DESC LIMIT 50", (f"%@{os.getenv('DOMAIN')}",))
+    return [r[0] for r in cur.fetchall()]
