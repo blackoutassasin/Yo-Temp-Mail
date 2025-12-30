@@ -1,11 +1,10 @@
 import os, random, string, re
 import telebot
 from telebot.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from database import set_user_email, get_user_email, get_inbox, get_user_all_emails
+from database import set_user_email, get_user_email, get_inbox, get_user_all_emails, delete_email
 from dotenv import load_dotenv
 
 load_dotenv()
-
 bot = telebot.TeleBot(os.getenv("BOT_TOKEN"))
 DOMAIN = os.getenv("DOMAIN")
 
@@ -29,54 +28,60 @@ def keyboard():
 def start(m):
     email = gen_email()
     set_user_email(m.chat.id, email)
-    bot.send_message(
-        m.chat.id,
-        f"👋 *Yo-Temp-Mail Bot*\n\n📮 *Active Email:* `{email}`",
-        reply_markup=keyboard(),
-        parse_mode="Markdown"
-    )
+    bot.send_message(m.chat.id, f"👋 *Yo-Temp-Mail Bot*\n\n📮 *Active Email:* `{email}`", reply_markup=keyboard(), parse_mode="Markdown")
 
 @bot.message_handler(func=lambda m: m.text == "📧 Generate New Email")
 def new_email(m):
     email = gen_email()
     set_user_email(m.chat.id, email)
-    bot.send_message(m.chat.id, f"✅ *New Email Generated:*\n`{email}`", parse_mode="Markdown")
+    bot.send_message(m.chat.id, f"✅ *New Email:* `{email}`", parse_mode="Markdown")
 
 @bot.message_handler(func=lambda m: m.text == "📨 My Email History")
 def show_history(m):
     emails = get_user_all_emails(m.chat.id)
-    
     if not emails:
-        current = get_user_email(m.chat.id)
-        bot.send_message(m.chat.id, f"📍 *Current:* `{current}`\n(No history found)", parse_mode="Markdown")
+        bot.send_message(m.chat.id, "📭 *No history found!*", parse_mode="Markdown")
         return
 
-    markup = InlineKeyboardMarkup()
+    bot.send_message(m.chat.id, "📜 *Your Last 50 Emails:*")
     for email in emails:
-        markup.add(InlineKeyboardButton(text=f"📧 {email}", callback_data=f"set_{email}"))
-    
-    bot.send_message(m.chat.id, "📜 *Your Last 50 Emails:*\nClick to activate an old address.", reply_markup=markup, parse_mode="Markdown")
+        markup = InlineKeyboardMarkup()
+        markup.add(
+            InlineKeyboardButton("✅ Activate", callback_data=f"set_{email}"),
+            InlineKeyboardButton("🗑️ Delete", callback_data=f"del_{email}")
+        )
+        bot.send_message(m.chat.id, f"📧 `{email}`", reply_markup=markup, parse_mode="Markdown")
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('set_'))
-def handle_set_email(call):
-    selected = call.data.split('_')[1]
-    set_user_email(call.message.chat.id, selected)
-    bot.answer_callback_query(call.id, f"Activated: {selected}")
-    bot.edit_message_text(f"✅ *Active Email Changed!*\n📮 `{selected}`", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+@bot.callback_query_handler(func=lambda call: True)
+def handle_query(call):
+    data = call.data
+    if data.startswith('set_'):
+        email = data.split('_')[1]
+        set_user_email(call.message.chat.id, email)
+        bot.answer_callback_query(call.id, f"Activated: {email}")
+        bot.edit_message_text(f"✅ *Active Email Changed!*\n📮 `{email}`", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+    
+    elif data.startswith('del_'):
+        email = data.split('_')[1]
+        delete_email(call.message.chat.id, email)
+        bot.answer_callback_query(call.id, "🗑️ Email Deleted!", show_alert=True)
+        bot.delete_message(call.message.chat.id, call.message.message_id)
 
 @bot.message_handler(func=lambda m: m.text == "🔄 Refresh Inbox")
 def refresh(m):
     email = get_user_email(m.chat.id)
-    inbox = get_inbox(email)
+    if not email:
+        bot.send_message(m.chat.id, "❌ No active email found!")
+        return
     
+    inbox = get_inbox(email)
     if not inbox:
-        bot.send_message(m.chat.id, "📭 *Inbox is empty for:* \n`" + email + "`", parse_mode="Markdown")
+        bot.send_message(m.chat.id, f"📭 *Inbox Empty:* \n`{email}`", parse_mode="Markdown")
         return
 
     for sender, subject, body, time in inbox:
         formatted_body = bold_codes(body)
         links = extract_links(body)
-        
         text = (f"👤 *From:* {sender}\n📌 *Subject:* {subject}\n🕒 *Time:* {time}\n\n"
                 f"📝 *Message:* \n{formatted_body}")
         
@@ -87,6 +92,4 @@ def refresh(m):
         
         bot.send_message(m.chat.id, text[:4096], reply_markup=markup, parse_mode="Markdown")
 
-if __name__ == "__main__":
-    print("Bot is running...")
-    bot.infinity_polling()
+bot.infinity_polling()
