@@ -12,7 +12,7 @@ conn.commit()
 
 def set_user_email(tg_id, email):
     cur.execute("REPLACE INTO users VALUES (?,?)", (tg_id, email))
-    # ১৫ নম্বর লাইন (আগে এখানে ভুল ছিল, এখন ঠিক আছে)
+    # ১৫ নম্বর লাইন ঠিক করা হয়েছে
     cur.execute("INSERT OR IGNORE INTO email_history (telegram_id, email) VALUES (?,?)", (tg_id, email))
     conn.commit()
 
@@ -27,7 +27,7 @@ def get_tg_id_by_email(email):
     return r[0] if r else None
 
 def save_email(email, sender, subject, body):
-    # ৩০ নম্বর লাইন (এখান থেকে \ চিহ্নটি মুছে দেওয়া হয়েছে)
+    # ৩০ নম্বর লাইন ঠিক করা হয়েছে
     cur.execute("INSERT INTO inbox (email,sender,subject,body) VALUES (?,?,?,?)", (email, sender, subject, body))
     conn.commit()
 
