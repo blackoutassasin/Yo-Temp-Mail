@@ -1,6 +1,6 @@
 import os, random, string, re
 import telebot
-from telebot.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import set_user_email, get_user_email, get_inbox, get_user_all_emails, delete_email
 from dotenv import load_dotenv
 
@@ -15,81 +15,96 @@ def gen_email():
 def extract_links(text):
     return re.findall(r'(https?://\S+)', text)
 
-def bold_codes(text):
-    return re.sub(r'\b(\d{4,8})\b', r'*\1*', text)
-
-def keyboard():
-    kb = ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("📧 Generate New Email", "📨 My Email History")
-    kb.add("🔄 Refresh Inbox")
-    return kb
+# প্রফেশনাল মেইন প্যানেল জেনারেটর
+def get_main_panel(email):
+    text = (
+        f"📧 <b>Your Temporary Inbox</b>\n"
+        f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n"
+        f"📮 <b>Email:</b> <code>{email}</code>\n"
+        f"<i>(Tap to copy address)</i>\n\n"
+        f"🕒 <b>Status:</b> Listening for emails...\n"
+        f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+    )
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("🔄 Refresh Inbox", callback_data="refresh"),
+        InlineKeyboardButton("✨ New Address", callback_data="new_email")
+    )
+    markup.add(
+        InlineKeyboardButton("📜 History", callback_data="history"),
+        InlineKeyboardButton("🗑️ Delete", callback_data=f"del_{email}")
+    )
+    return text, markup
 
 @bot.message_handler(commands=["start"])
 def start(m):
     email = gen_email()
     set_user_email(m.chat.id, email)
-    bot.send_message(m.chat.id, f"👋 *Yo-Temp-Mail Bot*\n\n📮 *Active Email:* `{email}`", reply_markup=keyboard(), parse_mode="Markdown")
-
-@bot.message_handler(func=lambda m: m.text == "📧 Generate New Email")
-def new_email(m):
-    email = gen_email()
-    set_user_email(m.chat.id, email)
-    bot.send_message(m.chat.id, f"✅ *New Email:* `{email}`", parse_mode="Markdown")
-
-@bot.message_handler(func=lambda m: m.text == "📨 My Email History")
-def show_history(m):
-    emails = get_user_all_emails(m.chat.id)
-    if not emails:
-        bot.send_message(m.chat.id, "📭 *No history found!*", parse_mode="Markdown")
-        return
-
-    bot.send_message(m.chat.id, "📜 *Your Last 50 Emails:*")
-    for email in emails:
-        markup = InlineKeyboardMarkup()
-        markup.add(
-            InlineKeyboardButton("✅ Activate", callback_data=f"set_{email}"),
-            InlineKeyboardButton("🗑️ Delete", callback_data=f"del_{email}")
-        )
-        bot.send_message(m.chat.id, f"📧 `{email}`", reply_markup=markup, parse_mode="Markdown")
+    text, markup = get_main_panel(email)
+    bot.send_message(m.chat.id, text, reply_markup=markup, parse_mode="HTML")
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_query(call):
+    chat_id = call.message.chat.id
     data = call.data
-    if data.startswith('set_'):
+
+    if data == "refresh":
+        email = get_user_email(chat_id)
+        inbox = get_inbox(email)
+        if not inbox:
+            bot.answer_callback_query(call.id, "📭 Inbox is empty!")
+            return
+        
+        bot.answer_callback_query(call.id, "✅ Loading messages...")
+        for sender, subject, body, time in inbox:
+            msg_text = (
+                f"📨 <b>MESSAGE RECEIVED</b>\n"
+                f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+                f"👤 <b>From:</b> <code>{sender}</code>\n"
+                f"📌 <b>Subject:</b> {subject}\n"
+                f"🕒 <b>Time:</b> {time}\n"
+                f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n"
+                f"📝 <b>Body:</b>\n{body[:3000]}"
+            )
+            links = extract_links(body)
+            markup = InlineKeyboardMarkup()
+            if links:
+                for i, link in enumerate(links[:3]):
+                    markup.add(InlineKeyboardButton(text=f"🔗 Link {i+1}", url=link))
+            bot.send_message(chat_id, msg_text, reply_markup=markup, parse_mode="HTML")
+
+    elif data == "new_email":
+        email = gen_email()
+        set_user_email(chat_id, email)
+        text, markup = get_main_panel(email)
+        bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=markup, parse_mode="HTML")
+
+    elif data == "history":
+        emails = get_user_all_emails(chat_id)
+        if not emails:
+            bot.answer_callback_query(call.id, "❌ No history found!")
+            return
+        
+        bot.send_message(chat_id, "<b>📜 Your Last Emails:</b>", parse_mode="HTML")
+        for email in emails[:10]:
+            markup = InlineKeyboardMarkup()
+            markup.add(
+                InlineKeyboardButton("✅ Activate", callback_data=f"set_{email}"),
+                InlineKeyboardButton("🗑️ Delete", callback_data=f"del_{email}")
+            )
+            bot.send_message(chat_id, f"📧 <code>{email}</code>", reply_markup=markup, parse_mode="HTML")
+
+    elif data.startswith('set_'):
         email = data.split('_')[1]
-        set_user_email(call.message.chat.id, email)
-        bot.answer_callback_query(call.id, f"Activated: {email}")
-        bot.edit_message_text(f"✅ *Active Email Changed!*\n📮 `{email}`", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
-    
+        set_user_email(chat_id, email)
+        text, markup = get_main_panel(email)
+        bot.send_message(chat_id, "✅ <b>Email Activated!</b>", parse_mode="HTML")
+        bot.send_message(chat_id, text, reply_markup=markup, parse_mode="HTML")
+
     elif data.startswith('del_'):
         email = data.split('_')[1]
-        delete_email(call.message.chat.id, email)
-        bot.answer_callback_query(call.id, "🗑️ Email Deleted!", show_alert=True)
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-
-@bot.message_handler(func=lambda m: m.text == "🔄 Refresh Inbox")
-def refresh(m):
-    email = get_user_email(m.chat.id)
-    if not email:
-        bot.send_message(m.chat.id, "❌ No active email found!")
-        return
-    
-    inbox = get_inbox(email)
-    if not inbox:
-        bot.send_message(m.chat.id, f"📭 *Inbox Empty:* \n`{email}`", parse_mode="Markdown")
-        return
-
-    for sender, subject, body, time in inbox:
-        formatted_body = bold_codes(body)
-        links = extract_links(body)
-        text = (f"👤 *From:* {sender}\n📌 *Subject:* {subject}\n🕒 *Time:* {time}\n\n"
-                f"📝 *Message:* \n{formatted_body}")
-        
-        markup = InlineKeyboardMarkup()
-        if links:
-            for i, link in enumerate(links[:3]):
-                markup.add(InlineKeyboardButton(text=f"🔗 Link {i+1}", url=link))
-        
-        bot.send_message(m.chat.id, text[:4096], reply_markup=markup, parse_mode="Markdown")
+        delete_email(chat_id, email)
+        bot.answer_callback_query(call.id, "🗑️ Deleted!", show_alert=True)
+        bot.delete_message(chat_id, call.message.message_id)
 
 bot.infinity_polling()
