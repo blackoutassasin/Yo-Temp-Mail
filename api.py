@@ -18,20 +18,17 @@ def email():
     email_to = data["to"]
     save_email(email_to, data["from"], data["subject"], data["body"])
 
-    # ইউজারকে অটো নোটিফিকেশন পাঠানো
+    # নতুন মেইল আসলে ইউজারকে মেসেজ পাঠানো
     tg_id = get_tg_id_by_email(email_to)
     if tg_id:
-        notification_text = (
-            f"🔔 <b>New Message Received!</b>\n"
-            f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
-            f"👤 <b>From:</b> {data['from']}\n"
-            f"📌 <b>Subject:</b> {data['subject']}\n"
-            f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
-            f"<i>Check your inbox to read the full message.</i>"
-        )
+        text = (f"🔔 <b>New Mail Received!</b>\n"
+                f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+                f"👤 <b>From:</b> {data['from']}\n"
+                f"📌 <b>Subject:</b> {data['subject']}\n"
+                f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
         markup = telebot.types.InlineKeyboardMarkup()
         markup.add(telebot.types.InlineKeyboardButton("📥 View Inbox", callback_data="refresh"))
-        bot.send_message(tg_id, notification_text, parse_mode="HTML", reply_markup=markup)
+        bot.send_message(tg_id, text, parse_mode="HTML", reply_markup=markup)
 
     return jsonify({"ok": True})
 
