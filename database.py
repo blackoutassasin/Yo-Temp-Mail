@@ -12,7 +12,8 @@ conn.commit()
 
 def set_user_email(tg_id, email):
     cur.execute("REPLACE INTO users VALUES (?,?)", (tg_id, email))
-    cur.execute("INSERT OR IGNORE INTO email_history (telegram_id, email) VALUES (?,?)\", (tg_id, email))
+    # নিচে এররটি ফিক্স করা হয়েছে (ব্যাকস্ল্যাশ সরানো হয়েছে)
+    cur.execute("INSERT OR IGNORE INTO email_history (telegram_id, email) VALUES (?,?)", (tg_id, email))
     conn.commit()
 
 def get_user_email(tg_id):
