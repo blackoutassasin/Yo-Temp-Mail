@@ -12,11 +12,16 @@ conn.commit()
 
 def set_user_email(tg_id, email):
     cur.execute("REPLACE INTO users VALUES (?,?)", (tg_id, email))
-    cur.execute("INSERT OR IGNORE INTO email_history (telegram_id, email) VALUES (?,?)", (tg_id, email))
+    cur.execute("INSERT OR IGNORE INTO email_history (telegram_id, email) VALUES (?,?)\", (tg_id, email))
     conn.commit()
 
 def get_user_email(tg_id):
     cur.execute("SELECT email FROM users WHERE telegram_id=?", (tg_id,))
+    r = cur.fetchone()
+    return r[0] if r else None
+
+def get_tg_id_by_email(email):
+    cur.execute("SELECT telegram_id FROM users WHERE email=?", (email,))
     r = cur.fetchone()
     return r[0] if r else None
 
@@ -32,12 +37,8 @@ def get_user_all_emails(tg_id):
     cur.execute("SELECT email FROM email_history WHERE telegram_id=? ORDER BY id DESC LIMIT 50", (tg_id,))
     return [r[0] for r in cur.fetchall()]
 
-# নতুন ডিলিট ফাংশন
 def delete_email(tg_id, email):
-    # হিস্টোরি থেকে ডিলিট
     cur.execute("DELETE FROM email_history WHERE telegram_id=? AND email=?", (tg_id, email))
-    # ইনবক্স মেসেজ ডিলিট
     cur.execute("DELETE FROM inbox WHERE email=?", (email,))
-    # যদি এটি বর্তমান একটিভ মেইল হয় তবে সেটিও ডিলিট
     cur.execute("DELETE FROM users WHERE telegram_id=? AND email=?", (tg_id, email))
     conn.commit()
