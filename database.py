@@ -4,7 +4,6 @@ import os
 conn = sqlite3.connect("tempmail.db", check_same_thread=False)
 cur = conn.cursor()
 
-# টেবিল তৈরি
 cur.execute("CREATE TABLE IF NOT EXISTS users (telegram_id INTEGER PRIMARY KEY, email TEXT)")
 cur.execute("CREATE TABLE IF NOT EXISTS inbox (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, sender TEXT, subject TEXT, body TEXT, time DATETIME DEFAULT CURRENT_TIMESTAMP)")
 cur.execute("CREATE TABLE IF NOT EXISTS email_history (id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id INTEGER, email TEXT, UNIQUE(telegram_id, email))")
@@ -12,7 +11,7 @@ conn.commit()
 
 def set_user_email(tg_id, email):
     cur.execute("REPLACE INTO users VALUES (?,?)", (tg_id, email))
-    # নিচে এররটি ফিক্স করা হয়েছে (ব্যাকস্ল্যাশ সরানো হয়েছে)
+    # ফিক্স করা হয়েছে:
     cur.execute("INSERT OR IGNORE INTO email_history (telegram_id, email) VALUES (?,?)", (tg_id, email))
     conn.commit()
 
