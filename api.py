@@ -1,28 +1,39 @@
 import os
+import telebot
 from flask import Flask, request, jsonify
-from database import save_email
+from database import save_email, get_tg_id_by_email
 from dotenv import load_dotenv
 
 load_dotenv()
-
 app = Flask(__name__)
+bot = telebot.TeleBot(os.getenv("BOT_TOKEN"))
 SECRET = os.getenv("API_SECRET")
 
 @app.route("/email", methods=["POST"])
 def email():
     data = request.json
-
     if data.get("secret") != SECRET:
         return jsonify({"error": "forbidden"}), 403
 
-    save_email(
-        data["to"],
-        data["from"],
-        data["subject"],
-        data["body"]
-    )
+    email_to = data["to"]
+    save_email(email_to, data["from"], data["subject"], data["body"])
+
+    # ইউজারকে অটো নোটিফিকেশন পাঠানো
+    tg_id = get_tg_id_by_email(email_to)
+    if tg_id:
+        notification_text = (
+            f"🔔 <b>New Message Received!</b>\n"
+            f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+            f"👤 <b>From:</b> {data['from']}\n"
+            f"📌 <b>Subject:</b> {data['subject']}\n"
+            f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+            f"<i>Check your inbox to read the full message.</i>"
+        )
+        markup = telebot.types.InlineKeyboardMarkup()
+        markup.add(telebot.types.InlineKeyboardButton("📥 View Inbox", callback_data="refresh"))
+        bot.send_message(tg_id, notification_text, parse_mode="HTML", reply_markup=markup)
+
     return jsonify({"ok": True})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
-
