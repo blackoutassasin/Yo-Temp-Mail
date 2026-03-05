@@ -1,1 +1,1 @@
-web: python api.py & python main.py
+web: python start.py
